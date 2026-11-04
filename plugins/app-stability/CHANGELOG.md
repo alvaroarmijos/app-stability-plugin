@@ -2,7 +2,7 @@
 
 ## 0.3.0
 
-- `/app-stability:release-report` always includes the first-7-days stability chart, in both the short and the full report: a line per version, the daily table with its average, and notes on small samples, gaps and outside events. The short report is now two pages.
+- `/app-stability:release-report` always includes the first-7-days stability chart, in both the short and the full report: a line per version, the daily table with its average, and notes on small samples, gaps and outside events. The short report is now two pages: the chart first, then the data.
 - New `scripts/daily-series.mjs` pulls the daily series in one Firebase MCP session, with retries, and marks gaps and failed days, so a failed call never ends up in the chart.
 - Day 1 is the first day of an unbroken run of reported days; the crash-free denominator is the FATAL report's user count.
 

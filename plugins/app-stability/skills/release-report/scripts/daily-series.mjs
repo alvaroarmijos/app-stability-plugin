@@ -16,6 +16,7 @@
 // Prints a one-line summary to stderr and the rows as JSON (stdout or --out).
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 
 const argv = process.argv.slice(2)
 const opt = { versions: [] }
@@ -32,7 +33,7 @@ if (!opt.app || !opt.from || !opt.to || !opt.versions.length) {
   process.exit(2)
 }
 
-const server = spawn('firebase', ['mcp', '--tools', 'crashlytics_get_top_versions'], { stdio: ['pipe', 'pipe', 'ignore'] })
+const server = spawn('firebase', ['mcp', '--tools', 'crashlytics_get_top_versions'], { cwd: os.tmpdir(), stdio: ['pipe', 'pipe', 'ignore'] }) // tmpdir: keeps firebase-debug.log out of the report folder
 server.on('error', e => { console.error(`cannot start "firebase mcp": ${e.message}`); process.exit(1) })
 let buf = ''
 let nextId = 1

@@ -5,7 +5,7 @@ A [Claude Code](https://claude.com/claude-code) plugin for app stability. It rea
 | Command | What it does |
 |---|---|
 | `/app-stability:monitor` | Finds fresh and regressed crashes and triages each one. Mechanical fixes become a PR with a regression test; everything else becomes a GitHub issue, or a comment on the existing one. |
-| `/app-stability:release-report <version>` | Compares a release against the previous version and delivers an HTML or PDF report. Both include a first-7-days stability chart. The default short report gives the verdict, crash-free users and sessions, the top issues and the chart. The full report adds the method, the issue analysis, and gone and new issues. |
+| `/app-stability:release-report <version>` | Compares a release against the previous version and delivers an HTML or PDF report. Both include a first-7-days stability chart. The default short report opens with the chart, then gives the verdict, crash-free users and sessions, and the top issues. The full report adds the method, the issue analysis, and gone and new issues. |
 
 Auto-fixes are available for **Flutter** projects in this version. On any other stack the monitor still works: it files every crash as a GitHub issue and never edits code.
 

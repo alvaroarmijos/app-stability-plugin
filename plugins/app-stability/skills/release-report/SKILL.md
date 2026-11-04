@@ -16,7 +16,7 @@ All data comes from the Firebase MCP server bundled with this plugin. Its tools 
 
 1. **Target version**: a marketing version such as `5.21.7`. Build numbers differ per platform; you find them yourself.
 2. **Detail** (optional): `--detail short` or `--detail full`. The default is `short`.
-   - **short:** two pages with only what's needed to judge stability. Page 1 has the verdict, the crash-free numbers behind it, what drives the crashes, and the caveats. Page 2 has the stability chart.
+   - **short:** two pages with only what's needed to judge stability. Page 1 is the stability chart. Page 2 has the verdict, the crash-free numbers behind it, what drives the crashes, and the caveats.
    - **full:** the complete report: the method, the same-week table, the stability chart, the issue analysis, gone and new issues, and the conclusions.
 
    Both reports always include the stability chart (see "The stability chart" in Step 5).
@@ -141,7 +141,7 @@ Write the plan as Markdown before any HTML: one section per page, each headline 
 
 ### Short report
 
-Two pages. Page 1 covers sections 1–5, in this order; page 2 is the stability chart.
+Two pages. Page 1 is the stability chart; page 2 covers sections 1–5, in this order.
 
 1. **Verdict:** a one-sentence headline with its number, for example "5.21.7 is more stable on Android (+4.1 pts), unchanged on iOS".
 2. **KPI table:** one column per platform and version, plus a Change column per platform. Rows: crash-free users over the first 7 days (the average), then same-week crash-free users, crash-free sessions and active users (`totalUsersCount`).
@@ -152,7 +152,6 @@ Two pages. Page 1 covers sections 1–5, in this order; page 2 is the stability 
    - The same-week comparison isn't meaningful: say the verdict rests on the first-7-days averages.
    - Crashes were excluded.
 5. **Footer:** builds, windows, "crash-free = fatal events only", the source and the date.
-6. **Page 2, first 7 days:** the stability chart.
 
 ### Full report
 
@@ -216,6 +215,8 @@ Style rules:
 - Don't use red or green for "worse" or "better": put the change in text instead.
 - Numbers are tabular, and right-aligned in tables.
 - Write "—" for missing values, never a blank cell.
+- Keep "iOS" in its own casing inside uppercase headings and table headers (wrap it in a span with `text-transform: none`), so it never reads "IOS".
+- Keep headlines to one or two lines, with no word alone on the last line; shorten the headline rather than shrinking the type.
 - Take the owner's name from `git config user.name`.
 
 Generate `index.html` from a small script that holds the numbers, so each value is fixed in one place.
