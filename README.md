@@ -5,7 +5,7 @@ A [Claude Code](https://claude.com/claude-code) plugin for app stability. It rea
 | Command | What it does |
 |---|---|
 | `/app-stability:monitor` | Finds fresh and regressed crashes and triages each one. Mechanical fixes become a PR with a regression test; everything else becomes a GitHub issue, or a comment on the existing one. |
-| `/app-stability:release-report <version>` | Compares a release against the previous version (crash-free users and sessions, first-week trend, top issues, gone and new issues) and delivers it as an HTML or PDF report. |
+| `/app-stability:release-report <version>` | Compares a release against the previous version and delivers an HTML or PDF report. The default short report gives the verdict, crash-free users and sessions, and the top issues. The full report adds the first-week trend, the issue analysis, and gone and new issues. |
 
 Auto-fixes are available for **Flutter** projects in this version. On any other stack the monitor still works: it files every crash as a GitHub issue and never edits code.
 
@@ -68,18 +68,29 @@ Use a [scheduled task](https://docs.claude.com/en/docs/claude-code) or the `/sch
 
 ```text
 /app-stability:release-report 5.21.7
-/app-stability:release-report 5.21.7 --format pdf
+/app-stability:release-report 5.21.7 --detail full --format pdf
 ```
 
 | Argument | Default | |
 |---|---|---|
 | `<version>` | required | The release to judge, e.g. `5.21.7` |
+| `--detail short\|full` | `short` | A one-page report with only what's needed to judge stability, or the complete report |
 | `--format html\|pdf` | `html` | Deliver a self-contained HTML report or a PDF. PDF needs Playwright with Chromium |
 | `<package-id>...` | every app in the config files | Android package names or iOS bundle IDs |
 
-It finds each platform's build and the previous version, then pulls the same-week and first-7-days crash-free numbers and the per-version issue lists.
-- **Analysis:** it computes the changes, how concentrated the crashes are, and which issues are gone or new. It never tilts the verdict toward good news.
-- **Output:** `<app>-release-<target>-vs-<previous>/` with the report in the chosen format.
+It finds each platform's build and the previous version, then compares them over the same week. It never tilts the verdict toward good news.
+
+| | Short (default) | Full |
+|---|---|---|
+| Verdict with its number | ✓ | ✓ |
+| Same-week crash-free users and sessions, active users, change | ✓ | ✓ |
+| Target's top issues and crash concentration | top 3 | top 8, previous vs target |
+| Caveats and re-check date | ✓ | ✓ |
+| First-7-days daily trend | only when the same-week comparison isn't meaningful | ✓ |
+| Method page, gone and new issues, conclusions | | ✓ |
+| Length | 1 page | about 9 pages |
+
+- **Output:** `<app>-release-<target>-vs-<previous>/` (or `…-full/`), with the report in the chosen format.
 - **Style:** always the same plain, neutral style, with no dependency on other skills or plugins.
 
 Crash-free figures use fatal events only, which matches the Firebase console.
