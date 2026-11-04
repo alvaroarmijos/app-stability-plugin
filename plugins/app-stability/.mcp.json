@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "firebase": {
+      "command": "firebase",
+      "args": [
+        "mcp",
+        "--tools",
+        "crashlytics_get_top_issues,crashlytics_get_issue,crashlytics_list_events,crashlytics_get_top_versions,crashlytics_list_notes,crashlytics_create_note,firebase_list_apps"
+      ]
+    }
+  }
+}

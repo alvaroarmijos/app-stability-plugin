@@ -1,0 +1,24 @@
+{
+  "name": "app-stability-plugin",
+  "owner": {
+    "name": "Alvaro Armijos",
+    "url": "https://github.com/alvaroarmijos"
+  },
+  "metadata": {
+    "description": "Claude Code plugins for app stability: triage production crashes and report on releases.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "app-stability",
+      "description": "Triage fresh and regressed crashes from Firebase Crashlytics into fix PRs or GitHub issues, and compare a release's stability against the previous one.",
+      "version": "0.1.0",
+      "source": "./plugins/app-stability",
+      "repository": "https://github.com/alvaroarmijos/app-stability-plugin",
+      "homepage": "https://github.com/alvaroarmijos/app-stability-plugin",
+      "author": {
+        "name": "Alvaro Armijos"
+      }
+    }
+  ]
+}
