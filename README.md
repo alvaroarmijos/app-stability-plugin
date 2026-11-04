@@ -5,7 +5,7 @@ A [Claude Code](https://claude.com/claude-code) plugin for app stability. It rea
 | Command | What it does |
 |---|---|
 | `/app-stability:monitor` | Finds fresh and regressed crashes and triages each one. Mechanical fixes become a PR with a regression test; everything else becomes a GitHub issue, or a comment on the existing one. |
-| `/app-stability:release-report <version>` | Compares a release against the previous version and delivers an HTML or PDF report. The default short report gives the verdict, crash-free users and sessions, and the top issues. The full report adds the first-week trend, the issue analysis, and gone and new issues. |
+| `/app-stability:release-report <version>` | Compares a release against the previous version and delivers an HTML or PDF report. Both include a first-7-days stability chart. The default short report gives the verdict, crash-free users and sessions, the top issues and the chart. The full report adds the method, the issue analysis, and gone and new issues. |
 
 Auto-fixes are available for **Flutter** projects in this version. On any other stack the monitor still works: it files every crash as a GitHub issue and never edits code.
 
@@ -74,7 +74,7 @@ Use a [scheduled task](https://docs.claude.com/en/docs/claude-code) or the `/sch
 | Argument | Default | |
 |---|---|---|
 | `<version>` | required | The release to judge, e.g. `5.21.7` |
-| `--detail short\|full` | `short` | A one-page report with only what's needed to judge stability, or the complete report |
+| `--detail short\|full` | `short` | A two-page report with only what's needed to judge stability, or the complete report |
 | `--format html\|pdf` | `html` | Deliver a self-contained HTML report or a PDF. PDF needs Playwright with Chromium |
 | `<package-id>...` | every app in the config files | Android package names or iOS bundle IDs |
 
@@ -86,9 +86,9 @@ It finds each platform's build and the previous version, then compares them over
 | Same-week crash-free users and sessions, active users, change | ✓ | ✓ |
 | Target's top issues and crash concentration | top 3 | top 8, previous vs target |
 | Caveats and re-check date | ✓ | ✓ |
-| First-7-days daily trend | only when the same-week comparison isn't meaningful | ✓ |
+| First-7-days stability chart, with its data table | ✓ | ✓ |
 | Method page, gone and new issues, conclusions | | ✓ |
-| Length | 1 page | about 9 pages |
+| Length | 2 pages | about 9 pages |
 
 - **Output:** `<app>-release-<target>-vs-<previous>/` (or `…-full/`), with the report in the chosen format.
 - **Style:** always the same plain, neutral style, with no dependency on other skills or plugins.

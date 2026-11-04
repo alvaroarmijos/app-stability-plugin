@@ -1,6 +1,6 @@
 ---
 name: release-report
-description: Compare a mobile app release against the previous version in Firebase Crashlytics and deliver a stability report as HTML or PDF, either short (the verdict and the numbers behind it, the default) or full (trend, issue analysis, gone and new issues). Use when the user names a version to judge ("compare 5.21.7", "is the new release more stable?") or asks how a release is doing in Crashlytics.
+description: Compare a mobile app release against the previous version in Firebase Crashlytics and deliver a stability report as HTML or PDF, either short (the verdict, the numbers behind it and the stability chart; the default) or full (adds the method, the issue analysis, and gone and new issues). Use when the user names a version to judge ("compare 5.21.7", "is the new release more stable?") or asks how a release is doing in Crashlytics.
 argument-hint: "<version> [--detail short|full] [--format html|pdf] [package-id ...]"
 ---
 
@@ -16,8 +16,10 @@ All data comes from the Firebase MCP server bundled with this plugin. Its tools 
 
 1. **Target version**: a marketing version such as `5.21.7`. Build numbers differ per platform; you find them yourself.
 2. **Detail** (optional): `--detail short` or `--detail full`. The default is `short`.
-   - **short:** one page with only what's needed to judge stability: the verdict, the crash-free numbers behind it, what drives the crashes, and the caveats.
-   - **full:** the complete report: the method, the same-week table, the first-7-days trend, the issue analysis, gone and new issues, and the conclusions.
+   - **short:** two pages with only what's needed to judge stability. Page 1 has the verdict, the crash-free numbers behind it, what drives the crashes, and the caveats. Page 2 has the stability chart.
+   - **full:** the complete report: the method, the same-week table, the stability chart, the issue analysis, gone and new issues, and the conclusions.
+
+   Both reports always include the stability chart (see "The stability chart" in Step 5).
 
    Accept plain words too: "full", "complete" or "detailed" mean full; "short", "summary" or "brief" mean short.
 3. **Format** (optional): `--format html` or `--format pdf`. The default is `html`. Accept the same choice in plain words too ("as a PDF").
@@ -82,11 +84,27 @@ How to read them:
 | Same week, both versions | `get_top_versions`, last 7 days, FATAL, and again unfiltered | The headline: both versions face the same backend and the same days | yes | yes |
 | Top issues of the target | `get_top_issues` with `versionDisplayNames: [<target display name>]`, FATAL, 30 days, `pageSize` 5 (short) or 20 (full) | Concentration: what drives the crashes | yes | yes |
 | Issues of the previous version | the same call for the previous display name, `pageSize` 20 | Share per issue over time, plus gone and new issues | no | yes |
-| Daily crash-free users, first 7 reported days of each version | `get_top_versions`, FATAL, one call per day (1-day windows) | Supporting evidence: each version at the same age | only if needed | yes |
+| Daily crash-free users, first 7 reported days of each version | `scripts/daily-series.mjs` (below) | The stability chart: each version at the same age | yes | yes |
 
-In the short report, pull the daily series only for a platform where the same-week comparison isn't meaningful (see below). For that platform it becomes the main evidence. Otherwise skip it: it's the most expensive pull, with about 14 calls per platform.
+### Pull the daily series
 
-The first reported day is the first day a version has events: that's its effective release date. Days with no data are gaps, not zeros. List the dates so the gaps are visible.
+The daily series takes two calls per day and version, which is too many to make one at a time. Run the bundled script instead. It talks to the same Firebase MCP server in one session, retries rate-limited calls, and marks each day `ok`, `no_fatal` (users but no fatal events, so 100%), `no_data` (a gap) or `failed`:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/skills/release-report/scripts/daily-series.mjs" \
+  --app <app id> --from <YYYY-MM-DD> --to <YYYY-MM-DD> \
+  --version "<target display name>" --version "<previous display name>" --out <platform>-daily.json
+```
+
+1. **Find each version's release date first.**
+   - Call `get_top_versions` unfiltered with 7-day windows, going back from today, at most 90 days.
+   - Stop at the first window where the version has no users.
+   - Then run the script over that week and the 7 days after it.
+2. **Day 1 is the first day of an unbroken run of reported days.**
+   - An isolated earlier day followed by gaps, such as testers or a paused rollout, is not Day 1. List it in the notes, but don't count it.
+   - After Day 1, days with no data are gaps, not zeros. Skip them, take the next reported day, and show the dates so the gaps are visible.
+3. **Never use a `failed` row.** Re-run the script for those days. If they still fail, say which days are missing.
+4. **Crash-free users is `cfu`.** Its denominator is the FATAL report's `totalUsersCount` for that day, which the script stores as `users`. The unfiltered report's user count is different, so don't mix the two.
 
 If the previous version has almost no users left in the same week, the same-week comparison means little. That shows up as a tiny `totalUsersCount`, or 100% with zero crashes. Say so and lean on the first-7-days view for that platform. Users who stay on an old version may also be a different population.
 
@@ -102,8 +120,8 @@ Both reports:
 - **Share of users hit** for the target's top issues: the issue's impacted users divided by the target's `totalUsersCount`.
 - **Exclusions:** recompute crash-free users without the excluded issue by subtracting its users from the crashed users. Apply the same exclusion to both versions.
 
-Full report only, plus the short report when it pulled a daily series:
 - **First-week averages** of the daily series for each version, computed from the raw series. Use the same rounded value everywhere.
+- **The gap** between the two averages, in points, per platform.
 
 Full report only:
 - **Share of users hit, previous vs target, per issue.** It shows whether an old issue grew or shrank; raw counts mislead when adoption differs.
@@ -123,17 +141,18 @@ Write the plan as Markdown before any HTML: one section per page, each headline 
 
 ### Short report
 
-One page, in this order. Use a second page only when there are two platforms and they don't fit on one.
+Two pages. Page 1 covers sections 1–5, in this order; page 2 is the stability chart.
 
 1. **Verdict:** a one-sentence headline with its number, for example "5.21.7 is more stable on Android (+4.1 pts), unchanged on iOS".
-2. **KPI table:** same week, one column per platform and version, plus a Change column per platform. Rows: crash-free users, crash-free sessions, active users (`totalUsersCount`).
+2. **KPI table:** one column per platform and version, plus a Change column per platform. Rows: crash-free users over the first 7 days (the average), then same-week crash-free users, crash-free sessions and active users (`totalUsersCount`).
 3. **What drives the crashes:** the target's top 3 issues by users hit, each with its title, users and share of users. Then the concentration in one line.
 4. **Caveats and next check:** at most 3 bullets, using only the ones that apply.
    - The sample is small.
    - The release is young: give the re-check date.
-   - The same-week comparison isn't meaningful: give the first-7-days averages instead.
+   - The same-week comparison isn't meaningful: say the verdict rests on the first-7-days averages.
    - Crashes were excluded.
 5. **Footer:** builds, windows, "crash-free = fatal events only", the source and the date.
+6. **Page 2, first 7 days:** the stability chart.
 
 ### Full report
 
@@ -146,7 +165,7 @@ One page, in this order. Use a second page only when there are two platforms and
    - the samples (`totalUsersCount`);
    - the fatal-only definition and any exclusions.
 4. **Same week:** a table with crash-free users, crash-free sessions, crashes, users with a crash and active users. It has a column per platform and version, and a Change column per platform.
-5. **First 7 days:** a line chart of daily crash-free users for the platform that moved most, plus both first-week averages and the gap.
+5. **First 7 days:** the stability chart.
 6. **Issues:** the share of users hit, previous vs target, for the target's top issues (at most eight).
 7. **Gone vs new issues**, with the "gone can mean not seen yet" caveat.
 8. **Conclusions:** one line per platform, the fixes ranked by users hit, and the re-check date.
@@ -163,9 +182,34 @@ Write one self-contained `index.html`, with no external fonts, scripts or styles
 - A neutral palette: near-black text on white, and one accent color for the target version.
 - A system sans-serif for text and a monospace font for numbers.
 - A print stylesheet that puts one section per page (`@page { size: 1920px 1080px; margin: 0 }`). Add arrow-key navigation when there is more than one page.
-- Draw any chart as inline SVG from the data, with alt text and a data table. The short report has no chart unless it pulled a daily series.
+- Draw the chart as inline SVG from the data, with alt text.
 
-Both reports use the same style; the short one simply has one page, two at most.
+Both reports use the same style, and the same chart page.
+
+### The stability chart
+
+It's one page, in both reports, for the platform whose first-week gap is largest. Lay it out like this:
+
+- **Eyebrow:** the section number and "First 7 days".
+- **Headline:** the finding with both numbers, for example "At the same age, Android 5.21.7 averaged 97.6% crash-free users, vs 71.0% for 5.21.6."
+- **Left, about two thirds of the width:** a line chart of daily crash-free users.
+  - **X axis:** `Day 1` … `Day 7`, using each version's own first 7 reported days.
+  - **Y axis:** percentages, with gridlines every 10 points.
+    - Start the axis at a round 10 below the lowest value, or at 50% if that's lower. The axis may start above zero because these are rates, not counts.
+    - End it at 100%.
+  - **One line per version,** with a dot on each day and the version name as a label at the end of the line, not in a legend.
+    - The target is the accent color and drawn thicker. The previous version is neutral gray.
+- **Right, about one third:** the data table.
+  - Columns: Day, then the date and crash-free users for the previous version, then the date and crash-free users for the target.
+  - Show dates as `MM-DD`.
+  - The last row is **Average**, in bold.
+  - The target's values are in the accent color.
+- **Under the table:** two short notes.
+  - **The other platform:** its first-week averages and gap, in one line, for example "iOS first-week averages: 5.21.6 94.9%, 5.21.7 98.7% (+3.8 pts)".
+  - **What to read with care:** small Day 1 samples, with their user counts. Days without data. A dip that hit other versions on the same day, named as an outside event; check it with `get_top_versions` for that day. Or, when the two series cover different dates, say that a dip can't be checked against the other version, and name the low day.
+- **Alt text:** put a one-sentence description of the trend in the SVG's `<title>` and `aria-label`.
+
+If the platforms moved by similar amounts, within 2 points, chart both platforms side by side on the same page with smaller tables. If there is only one platform, chart that one.
 
 Style rules:
 - The target version is the accent and the previous version is neutral.
