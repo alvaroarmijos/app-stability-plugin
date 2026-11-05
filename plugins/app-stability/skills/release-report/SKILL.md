@@ -30,25 +30,9 @@ Don't ask for anything: pick sensible defaults, and state them in the report and
 
 ### Find the target version
 
-When no version is given:
+When no version is given, use the highest version with events in Crashlytics, on any platform. Take it from the 30-day `get_top_versions` call in "Find builds and the previous version". Ignore the project's manifest: it often holds a version that hasn't shipped yet, such as a bump on a release-prep branch.
 
-1. **Read the project's version.** Use the first manifest found at the repository root:
-
-   | Stack | File | Field |
-   |---|---|---|
-   | Flutter | `pubspec.yaml` | `version:`, without the `+build` part |
-   | React Native, Expo | `app.json` / `app.config.*`, then `package.json` | `expo.version`, then `version` |
-   | Android | `app/build.gradle(.kts)` | `versionName` |
-   | iOS | `*.xcodeproj/project.pbxproj` | `MARKETING_VERSION` |
-
-2. **Check it in Crashlytics.** Look for it in the 30-day `get_top_versions` call from "Find builds and the previous version". The manifest often holds a version that hasn't shipped yet, such as a version bump on a release-prep branch.
-   - **It has events:** use it.
-   - **It has none:** use the highest version that has events on any platform. Say why, for example "pubspec.yaml says 5.21.8, which has no Crashlytics data yet; using 5.21.7".
-3. **No manifest:** use the highest version with events.
-
-Name the resolved version and where it came from in the chat before the verdict, and in the report footer.
-
-If the tools are missing or a call fails with an authentication error, stop and tell the user to install the Firebase CLI (`npm i -g firebase-tools`), run `firebase login`, and restart Claude Code.
+Name the resolved version in the chat before the verdict, and in the report footer, for example "5.21.7: the latest version with Crashlytics data".
 
 ## Step 1: Resolve the apps
 

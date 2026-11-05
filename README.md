@@ -81,7 +81,7 @@ A [cloud scheduled task](https://code.claude.com/docs/en/routines) works too, bu
 
 | Argument | Default | |
 |---|---|---|
-| `[version]` | the project's version, if it has Crashlytics data | The release to judge, e.g. `5.21.7`. Without it, the version comes from the manifest (`pubspec.yaml`, `package.json`, `build.gradle` or the Xcode project). If that version has no Crashlytics data yet, for example a bump that hasn't shipped, the latest version with data is used |
+| `[version]` | the latest version with Crashlytics data | The release to judge, e.g. `5.21.7` |
 | `--detail short\|full` | `short` | A two-page report with only what's needed to judge stability, or the complete report |
 | `--format html\|pdf` | `html` | Deliver a self-contained HTML report or a PDF. PDF needs Playwright with Chromium |
 | `<package-id>...` | every app in the config files | Android package names or iOS bundle IDs |

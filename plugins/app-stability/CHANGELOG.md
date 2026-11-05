@@ -2,7 +2,7 @@
 
 ## 0.4.0
 
-- `/app-stability:release-report` no longer needs a version. Without one, it reads the project's version from `pubspec.yaml`, `package.json`/`app.json`, `build.gradle` or the Xcode project. If that version has no Crashlytics data yet, it falls back to the latest version with data, and says which version it chose and why.
+- `/app-stability:release-report` no longer needs a version. Without one, it judges the latest version with Crashlytics data, and says which version it chose.
 
 ## 0.3.0
 
