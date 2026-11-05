@@ -57,7 +57,7 @@ How it works:
 
 ### Run it on a schedule
 
-Use a [scheduled task](https://docs.claude.com/en/docs/claude-code) or the `/schedule` skill to run it daily in the repository, for example `/app-stability:monitor --base develop com.example.app`. The 24-hour default matches a daily run.
+Use a [Claude Code Desktop scheduled task](https://code.claude.com/docs/en/desktop-scheduled-tasks) to run it daily in the repository, for example `/app-stability:monitor --base develop com.example.app`. The 24-hour default matches a daily run. A desktop task runs on your machine, so it reuses your `firebase login` and `gh auth login`. A [cloud scheduled task](https://code.claude.com/docs/en/routines) would need the Firebase CLI and its credentials set up in that environment.
 
 ### Trade-offs
 
