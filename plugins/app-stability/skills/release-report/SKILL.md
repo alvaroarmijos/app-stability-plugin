@@ -1,12 +1,12 @@
 ---
 name: release-report
 description: Compare a mobile app release against the previous version in Firebase Crashlytics and deliver a stability report as HTML or PDF, either short (the verdict, the numbers behind it and the stability chart; the default) or full (adds the method, the issue analysis, and gone and new issues). Use when the user names a version to judge ("compare 5.21.7", "is the new release more stable?") or asks how a release is doing in Crashlytics.
-argument-hint: "<version> [--detail short|full] [--format html|pdf] [package-id ...]"
+argument-hint: "[version] [--detail short|full] [--format html|pdf] [package-id ...]"
 ---
 
 # Release stability report
 
-The user names the release to judge, for example `5.21.7`. Pull crash data for that release and for the version shipped right before it, on every platform the app has, and deliver a report that answers one question: **did this release make the app more or less stable?**
+The user names the release to judge, for example `5.21.7`, or leaves it out and the skill finds it. Pull crash data for that release and for the version shipped right before it, on every platform the app has, and deliver a report that answers one question: **did this release make the app more or less stable?**
 
 The answer can be "no". A release that got worse is a useful finding. Report what the data shows and never bend the headline toward good news.
 
@@ -14,7 +14,7 @@ All data comes from the Firebase MCP server bundled with this plugin. Its tools 
 
 ## Inputs
 
-1. **Target version**: a marketing version such as `5.21.7`. Build numbers differ per platform; you find them yourself.
+1. **Target version** (optional): a marketing version such as `5.21.7`. Build numbers differ per platform; you find them yourself. Without it, resolve it as in "Find the target version" below.
 2. **Detail** (optional): `--detail short` or `--detail full`. The default is `short`.
    - **short:** two pages with only what's needed to judge stability. Page 1 is the stability chart. Page 2 has the verdict, the crash-free numbers behind it, what drives the crashes, and the caveats.
    - **full:** the complete report: the method, the same-week table, the stability chart, the issue analysis, gone and new issues, and the conclusions.
@@ -26,7 +26,27 @@ All data comes from the Firebase MCP server bundled with this plugin. Its tools 
 4. **Apps** (optional): Android package names or iOS bundle IDs. Without them, use every app in the repository's Firebase config files.
 5. **Exclusions** (optional): crashes the user says are external and already fixed, such as an SDK bug. Exclude them only when the user says so, and link the upstream issue.
 
-If the version is missing, ask for it once. For everything else, pick sensible defaults and state them in the report.
+Don't ask for anything: pick sensible defaults, and state them in the report and in the chat.
+
+### Find the target version
+
+When no version is given:
+
+1. **Read the project's version.** Use the first manifest found at the repository root:
+
+   | Stack | File | Field |
+   |---|---|---|
+   | Flutter | `pubspec.yaml` | `version:`, without the `+build` part |
+   | React Native, Expo | `app.json` / `app.config.*`, then `package.json` | `expo.version`, then `version` |
+   | Android | `app/build.gradle(.kts)` | `versionName` |
+   | iOS | `*.xcodeproj/project.pbxproj` | `MARKETING_VERSION` |
+
+2. **Check it in Crashlytics.** Look for it in the 30-day `get_top_versions` call from "Find builds and the previous version". The manifest often holds a version that hasn't shipped yet, such as a version bump on a release-prep branch.
+   - **It has events:** use it.
+   - **It has none:** use the highest version that has events on any platform. Say why, for example "pubspec.yaml says 5.21.8, which has no Crashlytics data yet; using 5.21.7".
+3. **No manifest:** use the highest version with events.
+
+Name the resolved version and where it came from in the chat before the verdict, and in the report footer.
 
 If the tools are missing or a call fails with an authentication error, stop and tell the user to install the Firebase CLI (`npm i -g firebase-tools`), run `firebase login`, and restart Claude Code.
 

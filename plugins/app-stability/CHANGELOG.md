@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0
+
+- `/app-stability:release-report` no longer needs a version. Without one, it reads the project's version from `pubspec.yaml`, `package.json`/`app.json`, `build.gradle` or the Xcode project. If that version has no Crashlytics data yet, it falls back to the latest version with data, and says which version it chose and why.
+
 ## 0.3.0
 
 - `/app-stability:release-report` always includes the first-7-days stability chart, in both the short and the full report: a line per version, the daily table with its average, and notes on small samples, gaps and outside events. The short report is now two pages: the chart first, then the data.
