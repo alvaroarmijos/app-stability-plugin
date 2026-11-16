@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.1
+
+- When the Firebase tools are missing or fail, `/app-stability:monitor` and `/app-stability:release-report` now check the Firebase CLI and say exactly what to do: `firebase login --reauth` when the login expired, `firebase login` when not logged in, installing the CLI when it's missing, or just restarting Claude Code when the login works. The monitor returns the reason as `firebase_auth`.
+
 ## 0.4.0
 
 - `/app-stability:release-report` no longer needs a version. Without one, it judges the latest version with Crashlytics data, and says which version it chose.

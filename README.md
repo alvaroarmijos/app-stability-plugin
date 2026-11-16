@@ -26,6 +26,8 @@ Then restart Claude Code, so the plugin's MCP server starts.
 
 To check the setup, `claude mcp list` should show the plugin's `firebase` server as connected.
 
+The Firebase login expires from time to time. When it does, the monitor and the report stop and tell you to run `firebase login --reauth` and restart Claude Code.
+
 ## Monitor
 
 ```text

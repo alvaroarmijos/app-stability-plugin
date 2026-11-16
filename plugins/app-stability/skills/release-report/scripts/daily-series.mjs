@@ -91,8 +91,9 @@ async function report(start, end, filter) {
     })
     const text = (res.result?.content || []).map(c => c.text).join('')
     if (res.result && !res.result.isError) return parse(text)
-    if (/auth|credential|login/i.test(text)) {
+    if (/auth|credential|login|invalid_grant/i.test(text)) {
       console.error(`authentication failed: ${text.slice(0, 200)}`)
+      console.error('Fix: run `firebase login --reauth`, then restart Claude Code.')
       process.exit(1)
     }
     await sleep(3000 * (attempt + 1)) // rate limits clear after a few seconds

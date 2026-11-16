@@ -15,7 +15,7 @@ const source = fs
 const STATUS = { i1: 'no_existing_work', i2: 'pr_open', i3: 'pr_merged', i4: 'pr_merged', i5: 'issue_open' }
 const HIGH = new Set(['i1', 'i5'])
 
-async function run(argv, { stack = 'flutter', mcpUnavailable = false } = {}) {
+async function run(argv, { stack = 'flutter', mcpUnavailable = false, firebaseAuth = 'not_logged_in' } = {}) {
   const calls = []
   const prompts = {}
   const agent = async (prompt, opts = {}) => {
@@ -24,7 +24,7 @@ async function run(argv, { stack = 'flutter', mcpUnavailable = false } = {}) {
     prompts[label] = prompt
     const id = label.split(':')[1]
     if (opts.phase === 'Discover') {
-      if (mcpUnavailable) return { mcp_unavailable: true, stack: '', apps: [], issues: [], message: 'run firebase login' }
+      if (mcpUnavailable) return { mcp_unavailable: true, firebase_auth: firebaseAuth, stack: '', apps: [], issues: [], message: 'cli error' }
       return {
         mcp_unavailable: false,
         stack,
@@ -125,6 +125,19 @@ const tests = {
     const { result, calls } = await run([], { mcpUnavailable: true })
     assert.equal(result.error, 'mcp_unavailable')
     assert.deepEqual(calls, ['Discover'])
+  },
+
+  async 'tells the user to reauth when the Firebase login expired'() {
+    const { result } = await run([], { mcpUnavailable: true, firebaseAuth: 'reauth_required' })
+    assert.equal(result.firebase_auth, 'reauth_required')
+    assert.match(result.message, /firebase login --reauth/)
+    assert.match(result.message, /Firebase CLI said: cli error/)
+  },
+
+  async 'falls back to a generic fix for an unknown auth state'() {
+    const { result } = await run([], { mcpUnavailable: true, firebaseAuth: 'bogus' })
+    assert.equal(result.firebase_auth, 'unknown')
+    assert.match(result.message, /--reauth/)
   },
 
   async 'prompts never hard-code an MCP tool prefix'() {

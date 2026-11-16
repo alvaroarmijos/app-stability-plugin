@@ -12,6 +12,22 @@ The answer can be "no". A release that got worse is a useful finding. Report wha
 
 All data comes from the Firebase MCP server bundled with this plugin. Its tools are named `crashlytics_*` and `firebase_*`; load them with ToolSearch (query `crashlytics`). Never open the Firebase console in a browser.
 
+### When the Firebase tools fail
+
+If ToolSearch finds no `crashlytics_*` tools, or a call (or `daily-series.mjs`) fails, find out why before giving up:
+
+```bash
+command -v firebase || echo CLI_MISSING
+firebase projects:list --json --non-interactive 2>&1 | head -c 1500
+```
+
+Then stop and tell the user exactly what to do, quoting the CLI's error line:
+
+- **Login expired** (the output mentions `--reauth`, "credentials are no longer valid" or `invalid_grant`): "Your Firebase login expired. Run `firebase login --reauth`, then restart Claude Code."
+- **Not logged in** ("No authorized accounts", "not logged in"): "Run `firebase login`, then restart Claude Code."
+- **CLI missing** (`CLI_MISSING`): "Run `npm i -g firebase-tools`, then `firebase login`, then restart Claude Code."
+- **Login works** (`"status": "success"`) but the tools are missing: "The Firebase connection didn't start or timed out. Restart Claude Code." If only one call failed, retry it once first.
+
 ## Inputs
 
 1. **Target version** (optional): a marketing version such as `5.21.7`. Build numbers differ per platform; you find them yourself. Without it, resolve it as in "Find the target version" below.
