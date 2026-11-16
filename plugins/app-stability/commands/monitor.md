@@ -23,4 +23,4 @@ Arguments:
 - `--dry-run`: stop after classifying and return the planned action per issue. Nothing is written to GitHub or Firebase.
 - `<package-id>...`: Android package names or iOS bundle IDs to monitor. Default: every app in the repository's Firebase config files.
 
-When the workflow finishes, summarize its result for the user: PRs opened, issues filed, comments added, issues skipped and why, and any issue that regressed after a merged fix. If it returns `mcp_unavailable`, show its message: the Firebase CLI must be installed and logged in, and Claude Code restarted.
+When the workflow finishes, summarize its result for the user: PRs opened, issues filed, comments added, issues skipped and why, and any issue that regressed after a merged fix. If it returns `mcp_unavailable`, lead with its `message` word for word, including the command to run (for example `firebase login --reauth` when `firebase_auth` is `reauth_required`), then say that nothing was triaged or created. Don't replace it with a generic install-and-login hint.

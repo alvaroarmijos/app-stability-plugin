@@ -44,6 +44,21 @@ package_name: the top-level \`name:\` value in pubspec.yaml.`,
   },
 }
 
+// What the user must do when the Firebase MCP can't be used, by discovery.firebase_auth.
+// "ok" means the CLI login works, so the MCP server itself failed or timed out at startup.
+const FIREBASE_FIX = {
+  reauth_required:
+    'Your Firebase login expired. Run `firebase login --reauth` in a terminal, then restart Claude Code so the app-stability Firebase connection uses the new login.',
+  not_logged_in:
+    'The Firebase CLI is not logged in. Run `firebase login` with an account that can read the project\'s Crashlytics, then restart Claude Code.',
+  cli_missing:
+    'The Firebase CLI is not installed. Run `npm i -g firebase-tools` (version 15 or newer), then `firebase login`, then restart Claude Code.',
+  ok:
+    'The Firebase CLI is logged in, but the app-stability Firebase connection did not start or timed out. Restart Claude Code.',
+  unknown:
+    'The Firebase connection is unavailable. Run `firebase login --reauth` in a terminal (it also fixes an expired login), then restart Claude Code. If `firebase` is not found, install it first with `npm i -g firebase-tools`.',
+}
+
 const CRASH_TYPES = 'null_safety | type_cast | network | permission | logic_error | platform_channel | framework | unknown'
 
 // ── Schemas ────────────────────────────────────────────────────────────────
@@ -52,6 +67,7 @@ const DISCOVERY_SCHEMA = {
   type: 'object',
   properties: {
     mcp_unavailable: { type: 'boolean' },
+    firebase_auth: { type: 'string', enum: ['ok', 'cli_missing', 'not_logged_in', 'reauth_required', 'unknown'] },
     message: { type: 'string' },
     stack: { type: 'string' }, // a STACKS key, or "" when none matches
     stack_vars: {
@@ -200,10 +216,20 @@ const discovery = await agent(
 MCP server's tools (crashlytics_* and firebase_*; load them with ToolSearch, query "crashlytics").
 Never open a browser and never read email.
 
-If those tools are not available, or a call fails with an authentication error, stop and return
-mcp_unavailable=true, stack="", apps=[], issues=[], and a message with the fix: install the
-Firebase CLI (npm i -g firebase-tools), run "firebase login", and restart Claude Code so the
-app-stability plugin's MCP server starts.
+If those tools are not available, or any call to them fails, find out why before giving up. Run:
+  command -v firebase || echo CLI_MISSING
+  firebase projects:list --json --non-interactive 2>&1 | head -c 1500
+and set firebase_auth from the output:
+- "cli_missing": the first command printed CLI_MISSING.
+- "reauth_required": the output mentions "--reauth", "credentials are no longer valid", "invalid_grant"
+  or an expired / revoked token.
+- "not_logged_in": the output says "not logged in", "No authorized accounts", or asks to run "firebase login".
+- "ok": the command succeeded ("status": "success"), so the CLI login is fine.
+- "unknown": anything else.
+If the tools are not available or a call failed for one of these reasons other than "ok", stop and return
+mcp_unavailable=true, firebase_auth, stack="", apps=[], issues=[], and a message quoting the CLI's error
+line. If firebase_auth is "ok" and the tools are missing, also stop with mcp_unavailable=true. If it is
+"ok" and only one call failed, retry it once and continue.
 
 ## Step 0: Detect the stack (in the repository's working directory)
 Pick the first that matches:
@@ -252,8 +278,12 @@ if (!discovery) {
   return { triaged: 0, error: 'discovery_failed' }
 }
 if (discovery.mcp_unavailable) {
-  log(`Firebase MCP unavailable: ${discovery.message || ''}`)
-  return { triaged: 0, error: 'mcp_unavailable', message: discovery.message }
+  const auth = FIREBASE_FIX[discovery.firebase_auth] ? discovery.firebase_auth : 'unknown'
+  const message = [FIREBASE_FIX[auth], discovery.message && `Firebase CLI said: ${discovery.message}`]
+    .filter(Boolean)
+    .join('\n\n')
+  log(message)
+  return { triaged: 0, error: 'mcp_unavailable', firebase_auth: auth, message }
 }
 
 const stackKey = STACKS[discovery.stack] ? discovery.stack : ''
