@@ -4,7 +4,7 @@ A [Claude Code](https://claude.com/claude-code) plugin for app stability. It rea
 
 | Command | What it does |
 |---|---|
-| `/app-stability:monitor` | Finds fresh and regressed crashes and triages each one. Mechanical fixes become a PR with a regression test; everything else becomes a GitHub issue, or a comment on the existing one. |
+| `/app-stability:monitor` | Finds fresh, regressed and trending crashes and triages each one. Mechanical fixes become a PR with a regression test; everything else becomes a GitHub issue, or a comment on the existing one. |
 | `/app-stability:release-report [version]` | Compares a release against the previous version and delivers an HTML or PDF report. Both include a first-7-days stability chart. The default short report opens with the chart, then gives the verdict, crash-free users and sessions, and the top issues. The full report adds the method, the issue analysis, and gone and new issues. |
 
 Auto-fixes are available for **Flutter** projects in this version. On any other stack the monitor still works: it files every crash as a GitHub issue and never edits code.
@@ -40,12 +40,15 @@ The Firebase login expires from time to time. When it does, the monitor and the 
 | `--base <branch>` | repository default branch | Target branch for fix PRs |
 | `--hours <n>` | `24` | Look-back window, up to 90 days |
 | `--label <name>` | `needs-human-review` | Label for filed issues, created if missing |
+| `--trend-factor <n>` | `3` | How many times its usual hourly rate a version's events must reach to count as trending |
+| `--trend-min-events <n>` | `10` | Minimum events on one version in the window to count as trending |
+| `--no-trending` | off | Only look for fresh and regressed issues |
 | `--dry-run` | off | Plan only: nothing is written to GitHub or Firebase |
 | `<package-id>...` | every app in the config files | Android package names or iOS bundle IDs |
 
 How it works:
 
-1. **Discover.** It detects the stack and resolves the app IDs. Then it lists the issues Crashlytics flags as **fresh** or **regressed** in the window, counting fatal, non-fatal and ANR events. It skips issues an earlier run already noted.
+1. **Discover.** It detects the stack and resolves the app IDs. Then it lists the issues Crashlytics flags as **fresh** or **regressed** in the window, counting fatal, non-fatal and ANR events. It also finds **trending** issues: old issues whose events spike on one app version (see below). It skips issues an earlier run already noted.
 2. **Check existing.** It searches GitHub issues, PRs and commits for the Crashlytics issue ID.
    - An issue fixed by a merged PR is skipped, unless it regressed after that PR.
    - An issue with an open PR is skipped.
@@ -70,7 +73,8 @@ A [cloud scheduled task](https://code.claude.com/docs/en/routines) works too, bu
 
 ### Trade-offs
 
-- **The signals decide what it sees.** Only issues Crashlytics flags as fresh or regressed are triaged. Old issues that are simply growing are not. Widen the window with `--hours` to catch more.
+- **Trending is computed, not read.** Crashlytics's API has no "trending" signal: its trending email works it out itself. The monitor does the same, per app version. It takes the issues with at least `--trend-min-events` events in the window and compares each version's hourly event rate with its rate over the previous 7 days. A version at `--trend-factor` times its usual rate or more makes the issue trending. Comparing per version catches a spike on one old version that the issue's total would hide. The result won't match Firebase's email exactly.
+- **The window decides what it sees.** Daily runs with the 24-hour default cover the timeline with no gaps. A spike is missed only when a run is skipped, for example because the machine was asleep. Then run once by hand with `--hours 48`. A small overlap such as `--hours 30` also catches events that reach Crashlytics late. Overlap creates no duplicates, because the notes stop an issue from being triaged twice. Don't make a wide window the default: a longer window dilutes a one-day spike in the trending check.
 - **The notes live in Crashlytics.** If you delete an `app-stability:` note, the issue is triaged again on the next run.
 
 ## Release report

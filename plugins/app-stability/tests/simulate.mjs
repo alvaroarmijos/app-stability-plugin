@@ -11,8 +11,11 @@ const source = fs
   .replace(/^export const meta/m, 'const meta')
 
 // Fixture: i1 new, i2 has an open PR, i3 fixed by a merged PR, i4 regressed after a merged PR,
-// i5 already reported in an open GitHub issue. i1 is reported twice (fresh query + duplicate).
-const STATUS = { i1: 'no_existing_work', i2: 'pr_open', i3: 'pr_merged', i4: 'pr_merged', i5: 'issue_open' }
+// i5 already reported in an open GitHub issue, i6 an old issue trending on one version.
+// i1 is reported twice (fresh query + duplicate).
+const STATUS = { i1: 'no_existing_work', i2: 'pr_open', i3: 'pr_merged', i4: 'pr_merged', i5: 'issue_open', i6: 'no_existing_work' }
+const SIGNALS = { i4: ['SIGNAL_REGRESSED'], i6: ['TRENDING'] }
+const TREND = '5.12.3 (5496): 15 events in the last 24h vs 0 in the previous 7 days'
 const HIGH = new Set(['i1', 'i5'])
 
 async function run(argv, { stack = 'flutter', mcpUnavailable = false, firebaseAuth = 'not_logged_in' } = {}) {
@@ -30,12 +33,13 @@ async function run(argv, { stack = 'flutter', mcpUnavailable = false, firebaseAu
         stack,
         stack_vars: { flutter_cmd: 'fvm flutter', package_name: 'my_app' },
         apps: [{ package_id: 'com.example', app_id: '1:1:android:x', platform: 'android' }],
-        issues: ['i1', 'i2', 'i3', 'i4', 'i5', 'i1'].map(issueId => ({
+        issues: ['i1', 'i2', 'i3', 'i4', 'i5', 'i6', 'i1'].map(issueId => ({
           issue_id: issueId,
           app_id: '1:1:android:x',
           title: `title ${issueId}`,
           url: `https://console/${issueId}`,
-          signals: issueId === 'i4' ? ['SIGNAL_REGRESSED'] : ['SIGNAL_FRESH'],
+          signals: SIGNALS[issueId] || ['SIGNAL_FRESH'],
+          ...(issueId === 'i6' ? { trend_detail: TREND } : {}),
         })),
       }
     }
@@ -84,7 +88,8 @@ const tests = {
     assert.equal(result.dry_run, true)
     assert.equal(result.window_hours, 168)
     const actions = Object.fromEntries(result.planned.map(p => [p.issue_id, p.action]))
-    assert.deepEqual(actions, { i1: 'fix_pr', i4: 'file_github_issue', i5: 'fix_pr_closing_existing_issue' })
+    assert.deepEqual(actions, { i1: 'fix_pr', i4: 'file_github_issue', i5: 'fix_pr_closing_existing_issue', i6: 'file_github_issue' })
+    assert.deepEqual(result.trending, [{ issue_id: 'i6', title: 'title i6', trend_detail: TREND }])
     assert.equal(result.planned.find(p => p.issue_id === 'i4').regressed_after_pr, 'https://github/pr/i4')
     assert.deepEqual(result.already_fixed.map(r => r.issue_id), ['i3'])
     assert.deepEqual(result.skipped_pr_open.map(r => r.issue_id), ['i2'])
@@ -99,8 +104,10 @@ const tests = {
   async 'full run triages, keeps issue ids and annotates'() {
     const { result, prompts } = await run(['--base', 'develop', '--label', 'crash'])
     assert.deepEqual(result.prs_opened.map(r => r.issue_id).sort(), ['i1', 'i5'])
-    assert.deepEqual(result.github_issues_filed.map(r => r.issue_id), ['i4'])
+    assert.deepEqual(result.github_issues_filed.map(r => r.issue_id).sort(), ['i4', 'i6'])
     assert.deepEqual(result.regressed.map(r => r.issue_id), ['i4'])
+    assert.deepEqual(result.trending.map(r => r.issue_id), ['i6'])
+    assert.match(prompts['issue:i6'], /Trending: 5\.12\.3 \(5496\): 15 events/)
     assert.match(prompts['fix:i1'], /--base develop/)
     assert.match(prompts['fix:i1'], /fvm flutter analyze/)
     assert.match(prompts['fix:i5'], /Closes #77/)
@@ -117,8 +124,29 @@ const tests = {
     assert.ok(!calls.some(c => c.startsWith('fix:')))
     assert.match(prompts['classify:i1'], /always "low"/)
     // i1 and i4 get new issues; i5 already has one, so it gets a comment.
-    assert.deepEqual(result.github_issues_filed.map(r => r.issue_id).sort(), ['i1', 'i4'])
+    assert.deepEqual(result.github_issues_filed.map(r => r.issue_id).sort(), ['i1', 'i4', 'i6'])
     assert.deepEqual(result.comments_added.map(r => r.issue_id), ['i5'])
+  },
+
+  async 'asks Discover for trending issues per version by default'() {
+    const { prompts } = await run(['--dry-run', '--hours', '48'])
+    assert.match(prompts.Discover, /Step 3b: Find trending issues per app/)
+    assert.match(prompts.Discover, /crashlytics_get_top_versions/)
+    assert.match(prompts.Discover, /window events >= 10/)
+    assert.match(prompts.Discover, /window events \/ 48 >= 3 ×/)
+    assert.match(prompts.Discover, /-v-216H/)
+  },
+
+  async 'trend flags reach the Discover prompt'() {
+    const { prompts } = await run(['--dry-run', '--trend-factor', '2.5', '--trend-min-events', '5'])
+    assert.match(prompts.Discover, /window events >= 5/)
+    assert.match(prompts.Discover, />= 2\.5 ×/)
+  },
+
+  async '--no-trending skips the trending step'() {
+    const { prompts } = await run(['--dry-run', '--no-trending'])
+    assert.doesNotMatch(prompts.Discover, /Step 3b/)
+    assert.doesNotMatch(prompts.Discover, /baseline_start/)
   },
 
   async 'stops when the Firebase MCP is unavailable'() {
