@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0
+
+- `/app-stability:monitor` now also finds trending issues: old issues whose events spike on one app version, like the ones in Firebase's "Trending stability issues" email. Crashlytics's API has no trending signal, so the monitor compares each version's event rate in the window with its rate over the previous 7 days. Tune it with `--trend-factor` (default 3) and `--trend-min-events` (default 10), or turn it off with `--no-trending`. Trending issues are triaged like the rest and returned as `trending`, with the version that spiked.
+
 ## 0.4.1
 
 - When the Firebase tools are missing or fail, `/app-stability:monitor` and `/app-stability:release-report` now check the Firebase CLI and say exactly what to do: `firebase login --reauth` when the login expired, `firebase login` when not logged in, installing the CLI when it's missing, or just restarting Claude Code when the login works. The monitor returns the reason as `firebase_auth`.

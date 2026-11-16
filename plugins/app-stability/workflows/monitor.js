@@ -1,9 +1,9 @@
 export const meta = {
   name: 'monitor',
-  description: 'Poll Firebase Crashlytics for fresh and regressed issues and triage each one into a fix PR or a GitHub issue',
-  whenToUse: 'Run from the /app-stability:monitor command. args is an array of CLI-style strings: --base <branch>, --hours <n>, --label <name>, --dry-run, and app package / bundle IDs.',
+  description: 'Poll Firebase Crashlytics for fresh, regressed and trending issues and triage each one into a fix PR or a GitHub issue',
+  whenToUse: 'Run from the /app-stability:monitor command. args is an array of CLI-style strings: --base <branch>, --hours <n>, --label <name>, --trend-factor <n>, --trend-min-events <n>, --no-trending, --dry-run, and app package / bundle IDs.',
   phases: [
-    { title: 'Discover', detail: 'Detect the stack, resolve Firebase app IDs and list fresh/regressed Crashlytics issues' },
+    { title: 'Discover', detail: 'Detect the stack, resolve Firebase app IDs and list fresh, regressed and trending Crashlytics issues' },
     { title: 'Check Existing', detail: 'Look for GitHub issues, PRs and commits that already reference each Crashlytics issue' },
     { title: 'Extract', detail: 'Fetch issue details, the latest stack trace and affected versions' },
     { title: 'Classify', detail: 'Classify crash type and auto-fix confidence per issue' },
@@ -104,6 +104,7 @@ const DISCOVERY_SCHEMA = {
           error_type: { type: 'string' },
           event_count: { type: 'string' },
           user_count: { type: 'string' },
+          trend_detail: { type: 'string' },
         },
         required: ['issue_id', 'app_id', 'title', 'url', 'signals'],
       },
@@ -179,6 +180,9 @@ const NOTE_PREFIX = 'app-stability:'
 // --base <branch>   PR target branch (default: the repository default branch)
 // --hours <n>       look-back window (default 24, max 2160 = 90 days)
 // --label <name>    label for filed GitHub issues (default needs-human-review)
+// --trend-factor <n>      a version's event rate must be n times its baseline rate to trend (default 3)
+// --trend-min-events <n>  a version needs at least n events in the window to trend (default 10)
+// --no-trending     only look for fresh and regressed issues
 // --dry-run         stop after Classify, write nothing
 // remaining args    Android package names / iOS bundle IDs
 
@@ -186,6 +190,9 @@ let prBaseBranch = null
 let hours = 24
 let issueLabel = 'needs-human-review'
 let dryRun = false
+let trending = true
+let trendFactor = 3
+let trendMinEvents = 10
 const packageArgs = []
 const rawArgs = args ? (Array.isArray(args) ? args : String(args).split(/\s+/)) : []
 for (let i = 0; i < rawArgs.length; i++) {
@@ -197,6 +204,14 @@ for (let i = 0; i < rawArgs.length; i++) {
     if (n > 0) hours = Math.min(n, 90 * 24)
   } else if (a === '--label' && i + 1 < rawArgs.length) {
     issueLabel = rawArgs[++i]
+  } else if (a === '--trend-factor' && i + 1 < rawArgs.length) {
+    const n = parseFloat(rawArgs[++i])
+    if (n > 1) trendFactor = n
+  } else if (a === '--trend-min-events' && i + 1 < rawArgs.length) {
+    const n = parseInt(rawArgs[++i], 10)
+    if (n > 0) trendMinEvents = n
+  } else if (a === '--no-trending') {
+    trending = false
   } else if (a === '--dry-run') {
     dryRun = true
   } else if (a) {
@@ -250,7 +265,9 @@ platform = the segment after the project number in the app ID ("android" or "ios
 
 ## Step 2: Time window
 Run: date -u -v-${hours}H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "${hours} hours ago" +%Y-%m-%dT%H:%M:%SZ   (start)
-and: date -u +%Y-%m-%dT%H:%M:%SZ   (end)
+and: date -u +%Y-%m-%dT%H:%M:%SZ   (end)${trending ? `
+and: date -u -v-${hours + 168}H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "${hours + 168} hours ago" +%Y-%m-%dT%H:%M:%SZ   (baseline_start)
+The baseline window runs from baseline_start to start (the 7 days before the window).` : ''}
 
 ## Step 3: List candidate issues per app
 Call crashlytics_get_top_issues with appId, pageSize 20 and filter:
@@ -264,7 +281,26 @@ For each issue: issue_id (issue.id), title (issue.title + " — " + issue.subtit
 error_type (issue.errorType), event_count (metrics[0].eventsCount), user_count (metrics[0].impactedUsersCount),
 url = issue.uri with any "?..." query string removed.
 
-## Step 4: Skip issues triaged by an earlier run
+${trending ? `## Step 3b: Find trending issues per app
+Crashlytics has no "trending" signal (its trending email computes it), so compute it per app version,
+the way that email does. An old issue can spike on one version while its total looks flat.
+1. crashlytics_get_top_issues with appId, pageSize 50 and filter: intervalStartTime=<start>,
+   intervalEndTime=<end>, issueErrorTypes=["FATAL","NON_FATAL","ANR"] (no issueSignals). Keep the issues
+   with metrics[0].eventsCount >= ${trendMinEvents}, at most 15 (the ones with the most events).
+2. For each kept issue, call crashlytics_get_top_versions with appId, pageSize 20 and filter.issueId set
+   to the issue's id, TWICE: once for the window (<start> to <end>) and once for the baseline window
+   (<baseline_start> to <start>). get_top_versions honors filter.issueId; do NOT use
+   crashlytics_get_top_issues with filter.issueId for this, because it ignores that filter.
+3. Match the two lists by version.displayName (a version missing from the baseline has 0 events). A
+   version is trending when BOTH hold:
+   - window events >= ${trendMinEvents}
+   - window events / ${hours} >= ${trendFactor} × (baseline events / 168)   (events per hour)
+4. An issue is trending when at least one version is. Add "TRENDING" to its signals (merge with the
+   same issue from Step 3 when it is already there), and set trend_detail to one line per trending
+   version: "<version>: <n> events in the last ${hours}h vs <m> in the previous 7 days". Fill title, url,
+   error_type, event_count and user_count from the Step 3b.1 response as in Step 3.
+
+` : ''}## Step 4: Skip issues triaged by an earlier run
 For each candidate call crashlytics_list_notes(appId, issueId). If any note body starts with
 "${NOTE_PREFIX}", drop the issue and add its id to skipped_noted, UNLESS its signals include
 SIGNAL_REGRESSED, in which case keep it.
@@ -295,7 +331,7 @@ if ((discovery.skipped_noted || []).length) {
   log(`Skipped ${discovery.skipped_noted.length} issue(s) already triaged by an earlier run.`)
 }
 if (!discovery.issues.length) {
-  log(discovery.message || `No fresh or regressed Crashlytics issues in the last ${hours}h.`)
+  log(discovery.message || `No fresh, regressed${trending ? " or trending" : ""} Crashlytics issues in the last ${hours}h.`)
   return { triaged: 0, stack: stackKey, apps: discovery.apps }
 }
 
@@ -313,7 +349,10 @@ for (const item of discovery.issues) {
 const dedupedIssues = [...issueGroups.values()]
 const isRegressed = i => (i.signals || []).includes('SIGNAL_REGRESSED')
 
-log(`Found ${dedupedIssues.length} issue(s) across ${discovery.apps.length} app(s) in the last ${hours}h.`)
+const isTrending = i => (i.signals || []).includes('TRENDING')
+const trendingIssues = dedupedIssues.filter(isTrending)
+
+log(`Found ${dedupedIssues.length} issue(s) across ${discovery.apps.length} app(s) in the last ${hours}h${trendingIssues.length ? `, ${trendingIssues.length} trending` : ''}.`)
 
 // ── Check Existing → Extract → Classify, pipelined per issue ───────────────
 const normalizeStatus = s =>
@@ -483,6 +522,7 @@ if (dryRun) {
     })),
     already_fixed: alreadyFixedResults.map(r => ({ issue_id: r.issue_id, pr_url: r.existing_pr_url })),
     skipped_pr_open: prOpenSkipped.map(r => ({ issue_id: r.issue_id, pr_url: r.existing_pr_url })),
+    trending: trendingIssues.map(i => ({ issue_id: i.issue_id, title: i.title, trend_detail: i.trend_detail || '' })),
   }
 }
 
@@ -496,7 +536,8 @@ const evidenceLines = issue => `Crashlytics URL: ${issue.url}
 Signals: ${(issue.signals || []).join(', ') || '(none)'}  |  Error type: ${issue.error_type || 'unknown'}  |  Events: ${issue.event_count || '?'}
 Users affected: ${issue.user_count}  |  Affected versions: ${issue.affected_versions}
 First seen: ${issue.first_seen}  |  Last seen: ${issue.last_seen}${issue.regressed_after_pr ? `
-Regressed after merged PR: ${issue.regressed_after_pr} (that fix did not hold)` : ''}`
+Regressed after merged PR: ${issue.regressed_after_pr} (that fix did not hold)` : ''}${issue.trend_detail ? `
+Trending: ${issue.trend_detail.replace(/\n+/g, '; ')}` : ''}`
 
 const regressionTestStep = issue => `2b. Add a regression test for the fix (required unless the code is genuinely untestable):
    - Find the mirrored test file (${stack.testLocation}) for ${issue.affected_file}. Extend it if it exists,
@@ -659,5 +700,6 @@ return {
   already_fixed: alreadyFixedResults.map(r => ({ issue_id: r.issue_id, pr_url: r.existing_pr_url })),
   skipped_pr_open: prOpenSkipped.map(r => ({ issue_id: r.issue_id, pr_url: r.existing_pr_url })),
   regressed: regressed.map(r => ({ issue_id: r.issue_id, previous_pr: r.regressed_after_pr })),
+  trending: trendingIssues.map(i => ({ issue_id: i.issue_id, title: i.title, trend_detail: i.trend_detail || '' })),
   notes_failed: annotate.failed,
 }
