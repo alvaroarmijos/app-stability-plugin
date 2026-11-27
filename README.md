@@ -5,7 +5,7 @@ A [Claude Code](https://claude.com/claude-code) plugin for app stability. It rea
 | Command | What it does |
 |---|---|
 | `/app-stability:monitor` | Finds fresh, regressed and trending crashes and triages each one. Mechanical fixes become a PR with a regression test; everything else becomes a GitHub issue, or a comment on the existing one. |
-| `/app-stability:release-report [version]` | Compares a release against the previous version and delivers an HTML or PDF report. Both include a first-7-days stability chart. The default short report opens with the chart, then gives the verdict, crash-free users and sessions, and the top issues. The full report adds the method, the issue analysis, and gone and new issues. |
+| `/app-stability:release-report [version]` | Compares a release against the previous version and delivers an HTML or PDF report. Both include the first-7-days stability charts. The default short report is two plain pages: a verdict card per platform (first-week crash-free users, the change in words, the top crash to fix), then the daily charts only. The full report adds the same-week numbers, the method, the issue analysis, and gone and new issues. |
 
 Auto-fixes are available for **Flutter** projects in this version. On any other stack the monitor still works: it files every crash as a GitHub issue and never edits code.
 
@@ -88,19 +88,20 @@ A [cloud scheduled task](https://code.claude.com/docs/en/routines) works too, bu
 | Argument | Default | |
 |---|---|---|
 | `[version]` | the latest version with Crashlytics data | The release to judge, e.g. `5.21.7` |
-| `--detail short\|full` | `short` | A two-page report with only what's needed to judge stability, or the complete report |
-| `--format html\|pdf` | `html` | Deliver a self-contained HTML report or a PDF. PDF needs Playwright with Chromium |
+| `--detail short\|full` | `short` | A two-page report anyone can read at a glance, or the complete report |
+| `--format html\|pdf` | `html` | Deliver a self-contained HTML report or a PDF. PDF needs Playwright's Chromium, or falls back to an installed Chrome or Chromium run headless |
 | `<package-id>...` | every app in the config files | Android package names or iOS bundle IDs |
 
 It finds each platform's build and the previous version, then compares them over the same week. It never tilts the verdict toward good news.
 
 | | Short (default) | Full |
 |---|---|---|
-| Verdict with its number | ✓ | ✓ |
-| Same-week crash-free users and sessions, active users, change | ✓ | ✓ |
-| Target's top issues and crash concentration | top 3 | top 8, previous vs target |
-| Caveats and re-check date | ✓ | ✓ |
-| First-7-days stability chart, with its data table | ✓ | ✓ |
+| Verdict in plain words | ✓ | ✓ |
+| First-week crash-free users per platform, previous value, change | ✓ (cards) | ✓ |
+| Same-week crash-free users and sessions, active users | | ✓ |
+| Top crash to fix | top 1 per platform | top 8, previous vs target, with concentration |
+| Main caveat and re-check date | one line | ✓ |
+| First-7-days stability charts | ✓ (charts only) | ✓ (with data table and notes) |
 | Method page, gone and new issues, conclusions | | ✓ |
 | Length | 2 pages | about 9 pages |
 

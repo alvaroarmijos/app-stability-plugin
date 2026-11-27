@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.6.0
+
+- `/app-stability:release-report`'s short report is simpler, for readers who aren't developers. Page 1 is the verdict in plain words with one card per platform: the first-week crash-free users in big type, the previous value, the change in words ("No real change", "Slightly better", ...) and the top crash to fix, noting a fix that's already merged. Page 2 has only the daily stability charts, one per platform, with no tables. The full report is unchanged.
+- Without Playwright, the report now falls back to an installed Chrome or Chromium run headless, for the layout screenshots and for printing the PDF.
+
 ## 0.5.0
 
 - `/app-stability:monitor` now also finds trending issues: old issues whose events spike on one app version, like the ones in Firebase's "Trending stability issues" email. Crashlytics's API has no trending signal, so the monitor compares each version's event rate in the window with its rate over the previous 7 days. Tune it with `--trend-factor` (default 3) and `--trend-min-events` (default 10), or turn it off with `--no-trending`. Trending issues are triaged like the rest and returned as `trending`, with the version that spiked.
