@@ -1,6 +1,6 @@
 ---
 name: release-report
-description: Compare a mobile app release against the previous version in Firebase Crashlytics and deliver a stability report as HTML or PDF, either short (the verdict, the numbers behind it and the stability chart; the default) or full (adds the method, the issue analysis, and gone and new issues). Use when the user names a version to judge ("compare 5.21.7", "is the new release more stable?") or asks how a release is doing in Crashlytics.
+description: Compare a mobile app release against the previous version in Firebase Crashlytics and deliver a stability report as HTML or PDF, either short (a plain-language verdict card per platform and the daily stability charts; the default) or full (adds the method, the issue analysis, and gone and new issues). Use when the user names a version to judge ("compare 5.21.7", "is the new release more stable?") or asks how a release is doing in Crashlytics.
 argument-hint: "[version] [--detail short|full] [--format html|pdf] [package-id ...]"
 ---
 
@@ -32,7 +32,7 @@ Then stop and tell the user exactly what to do, quoting the CLI's error line:
 
 1. **Target version** (optional): a marketing version such as `5.21.7`. Build numbers differ per platform; you find them yourself. Without it, resolve it as in "Find the target version" below.
 2. **Detail** (optional): `--detail short` or `--detail full`. The default is `short`.
-   - **short:** two pages with only what's needed to judge stability. Page 1 is the stability chart. Page 2 has the verdict, the crash-free numbers behind it, what drives the crashes, and the caveats.
+   - **short:** two pages that anyone can read at a glance. Page 1 is the verdict: one card per platform with the first-week crash-free users, the previous value, the change in words and the top crash to fix. Page 2 has only the daily stability charts, one per platform, with no tables.
    - **full:** the complete report: the method, the same-week table, the stability chart, the issue analysis, gone and new issues, and the conclusions.
 
    Both reports always include the stability chart (see "The stability chart" in Step 5).
@@ -89,7 +89,7 @@ How to read them:
 - **The error-type filter changes the crash-free numbers.**
   - With `issueErrorTypes: ["FATAL"]` they match the console's crash-free users and sessions. Use this for every crash-free figure.
   - Without the filter, non-fatal errors count too, and the numbers are much lower.
-  - In Flutter apps, uncaught errors reported as fatal count as crashes. Explain this in the method section (full) or the footer (short).
+  - In Flutter apps, uncaught errors reported as fatal count as crashes. Explain this in the method section (full report only; the short report's footer just says "no fatal crash").
 - **Totals and percentages can be missing.** `totalUsersCount` and `totalSessionsCount` come only from SDK versions that support crash-free metrics. When the percentages are missing, write "—". Never compute them from other fields.
 - **A version with no fatal events doesn't appear in the FATAL-filtered report.**
   - Get its totals from the unfiltered call for the same window.
@@ -161,17 +161,22 @@ Write the plan as Markdown before any HTML: one section per page, each headline 
 
 ### Short report
 
-Two pages. Page 1 is the stability chart; page 2 covers sections 1–5, in this order.
+Two pages, written for someone who is not a developer. Less is more: no KPI table, no issue list, no daily tables and no long notes. The data the skill pulls still decides the verdict and the caveat; it just doesn't all go on the page.
 
-1. **Verdict:** a one-sentence headline with its number, for example "5.21.7 is more stable on Android (+4.1 pts), unchanged on iOS".
-2. **KPI table:** one column per platform and version, plus a Change column per platform. Rows: crash-free users over the first 7 days (the average), then same-week crash-free users, crash-free sessions and active users (`totalUsersCount`).
-3. **What drives the crashes:** the target's top 3 issues by users hit, each with its title, users and share of users. Then the concentration in one line.
-4. **Caveats and next check:** at most 3 bullets, using only the ones that apply.
-   - The sample is small.
-   - The release is young: give the re-check date.
-   - The same-week comparison isn't meaningful: say the verdict rests on the first-7-days averages.
-   - Crashes were excluded.
-5. **Footer:** builds, windows, "crash-free = fatal events only", the source and the date.
+**Page 1: the verdict.**
+1. **Eyebrow:** "Release <target> vs <previous>".
+2. **Headline:** the verdict in plain words, as short as possible, for example "5.21.8 is as stable as 5.21.7" or "5.21.8 is less stable than 5.21.7 on Android". The numbers go in the cards, not the headline.
+3. **Lead line:** what the number means, for example "Share of users who did not crash during each version's first 7 days".
+4. **One card per platform,** side by side, each with:
+   - the platform name;
+   - one big number in the accent color: the target's first-7-days average crash-free users;
+   - "was <x>% in <previous>" in gray;
+   - the change in words, then the points in gray: "No real change (+0.1 pts)", "Slightly better (+0.7 pts)", "Better (+4.1 pts)", "Slightly worse (−0.8 pts)" or "Worse (−3.2 pts)". Use "no real change" under 0.5 pts and "slightly" under 2 pts;
+   - **Top crash to fix:** the target's top issue by users hit, named in plain words (what it does, not the stack frame), with its user count. Add one fact that changes what to do about it, when there is one: a fix already merged after the target was cut (check `git log` for the issue ID or a matching fix), or the same issue being top on the other platform too.
+5. **One line under the cards:** the most important caveat with the next check date, for example "Next check: 2026-12-02. 5.21.8 is only 9 days old and samples are small, so moves under 1 pt are noise." When the same-week view disagrees with the verdict, or crashes were excluded, say that here instead, in one sentence.
+6. **Footer, one line:** the builds, "crash-free = users with no fatal crash, over each version's first 7 days", the source, the date and the owner.
+
+**Page 2: the daily stability charts.** See "The stability chart" in Step 5, short layout.
 
 ### Full report
 
@@ -203,21 +208,35 @@ Write one self-contained `index.html`, with no external fonts, scripts or styles
 - A print stylesheet that puts one section per page (`@page { size: 1920px 1080px; margin: 0 }`). Add arrow-key navigation when there is more than one page.
 - Draw the chart as inline SVG from the data, with alt text.
 
-Both reports use the same style, and the same chart page.
+Both reports use the same style. The chart page differs: the short report shows only the charts, the full report adds the data table and notes.
 
 ### The stability chart
 
-It's one page, in both reports, for the platform whose first-week gap is largest. Lay it out like this:
+The lines themselves are the same in both reports:
+- **X axis:** `Day 1` … `Day 7`, using each version's own first 7 reported days.
+- **Y axis:** percentages, with gridlines every 10 points.
+  - Start the axis at a round 10 below the lowest value, or at 50% if that's lower. The axis may start above zero because these are rates, not counts.
+  - End it at 100%.
+- **One line per version,** with a dot on each day and the version name as a label at the end of the line, not in a legend.
+  - The target is the accent color and drawn thicker. The previous version is neutral gray.
+- **Alt text:** put a one-sentence description of the trend in the SVG's `<title>` and `aria-label`.
+
+#### Short layout
+
+One page with one chart per platform, side by side and large, always (one platform: one chart, full width).
+- **Eyebrow:** "Daily stability · first 7 days".
+- **Headline:** the finding in plain words, for example "Day by day, 5.21.8 tracks 5.21.7 on both platforms".
+- **Over each chart:** the platform name, then "Average: <previous> <x>% · <target> <y>%", the target in the accent color.
+- **No data table.**
+- **One line at the bottom:** what each line shows ("Each line is the share of users without a crash that day"), plus the single most misleading point, if any, explained in a few words, for example "Android 5.21.7's Day 1 dip (92.9%) is one user out of 14."
+
+#### Full layout
+
+It's one page for the platform whose first-week gap is largest. Lay it out like this:
 
 - **Eyebrow:** the section number and "First 7 days".
 - **Headline:** the finding with both numbers, for example "At the same age, Android 5.21.7 averaged 97.6% crash-free users, vs 71.0% for 5.21.6."
-- **Left, about two thirds of the width:** a line chart of daily crash-free users.
-  - **X axis:** `Day 1` … `Day 7`, using each version's own first 7 reported days.
-  - **Y axis:** percentages, with gridlines every 10 points.
-    - Start the axis at a round 10 below the lowest value, or at 50% if that's lower. The axis may start above zero because these are rates, not counts.
-    - End it at 100%.
-  - **One line per version,** with a dot on each day and the version name as a label at the end of the line, not in a legend.
-    - The target is the accent color and drawn thicker. The previous version is neutral gray.
+- **Left, about two thirds of the width:** the line chart of daily crash-free users.
 - **Right, about one third:** the data table.
   - Columns: Day, then the date and crash-free users for the previous version, then the date and crash-free users for the target.
   - Show dates as `MM-DD`.
@@ -226,7 +245,6 @@ It's one page, in both reports, for the platform whose first-week gap is largest
 - **Under the table:** two short notes.
   - **The other platform:** its first-week averages and gap, in one line, for example "iOS first-week averages: 5.21.6 94.9%, 5.21.7 98.7% (+3.8 pts)".
   - **What to read with care:** small Day 1 samples, with their user counts. Days without data. A dip that hit other versions on the same day, named as an outside event; check it with `get_top_versions` for that day. Or, when the two series cover different dates, say that a dip can't be checked against the other version, and name the low day.
-- **Alt text:** put a one-sentence description of the trend in the SVG's `<title>` and `aria-label`.
 
 If the platforms moved by similar amounts, within 2 points, chart both platforms side by side on the same page with smaller tables. If there is only one platform, chart that one.
 
@@ -241,9 +259,22 @@ Style rules:
 
 Generate `index.html` from a small script that holds the numbers, so each value is fixed in one place.
 
-**Check:** if headless Chromium (Playwright) is available, open `index.html` at 1920 × 1080 and screenshot each section. Fix overflow and colliding labels.
+**Headless browser:** use Playwright's Chromium when it's installed. Otherwise fall back to an installed Chrome or Chromium binary, run headless. Find one with:
 
-**PDF format only:** print `index.html` to a PDF named after the folder (`<folder name>.pdf`) with headless Chromium, using `print_background=True` and `prefer_css_page_size=True`. The page count must equal the section count. The HTML is only the source of the PDF here. If Playwright isn't available, say so, offer the HTML instead, and don't claim a PDF exists.
+```bash
+for b in "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" "/Applications/Chromium.app/Contents/MacOS/Chromium" google-chrome google-chrome-stable chromium chromium-browser; do
+  { [ -x "$b" ] || command -v "$b" >/dev/null 2>&1; } && { echo "$b"; break; }
+done
+```
+
+**Check:** open `index.html` at 1920 × 1080 and screenshot each section, then look at every screenshot. Fix overflow (a section's content cut off at the bottom) and colliding labels.
+- **Playwright:** set the viewport to 1920 × 1080 and screenshot each `<section>`.
+- **Chrome fallback:** `"$CHROME" --headless=new --disable-gpu --hide-scrollbars --window-size=1920,<1080 × section count> --screenshot=<out>.png "file://<abs path>/index.html"`, then crop the image into 1080-pixel-tall pages (`sips -c 1080 1920 --cropOffset <n × 1080> 0` on macOS). If the page adds screen-only spacing between sections, remove it in a temporary copy first, or the crops drift. Keep the screenshots in the scratchpad, not the report folder.
+
+**PDF format only:** print `index.html` to a PDF named after the folder (`<folder name>.pdf`). The page count must equal the section count; check it (for example, count `/Type /Page` objects in the file). The HTML is only the source of the PDF here.
+- **Playwright:** `page.pdf(...)` with `print_background=True` and `prefer_css_page_size=True`.
+- **Chrome fallback:** `"$CHROME" --headless=new --disable-gpu --no-pdf-header-footer --print-to-pdf="<abs path>/<folder name>.pdf" "file://<abs path>/index.html"`. Chrome uses the CSS `@page` size on its own; for backgrounds to print, the stylesheet needs `-webkit-print-color-adjust: exact; print-color-adjust: exact` under `@media print`. Say in the chat that the PDF was printed with headless Chrome.
+- **Neither available:** say so, offer the HTML instead, and don't claim a PDF exists.
 
 ## Step 6: Deliver
 
